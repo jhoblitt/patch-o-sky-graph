@@ -1,0 +1,130 @@
+digraph overlay_current
+{
+  dpi=100
+//  size="16,12!"
+  ranksep=1.5
+//  nodesep=1.5
+  rankdir=TB
+  overlap=false
+  clusterrank=local
+  compound=true
+  newrank=true
+
+
+  {
+    node [shape=ellipse fontsize=18 style=filled fillcolor=white]
+
+    ua [label="User Agent"]
+    lbwww [label="WWW LB"]
+    wwwpool [label="WWW server pool"]
+    cdn [label="CDN"]
+    delayjob [label="Delayed job service"]
+    delayjobdb [label="Redis?"]
+    smtp [label="SMTP gateway"]
+    lbapi [label="API LB"]
+    apipool [label="API server pool"]
+    apistatedb [label="Redis?"]
+    auth [label="Auth service"]
+    filemgt [label="[user] file content mgt"]
+    webserv [label="metaserv/webserv/etc."]
+    webservdb [label="SQL"]
+    filemgtdb [label="SQL"]
+    obssched [label="Observation Schedule Service"]
+    s3 [label="Object Storage"]
+    authdb [label="LDAP?"]
+    qserv
+    alertdb [label="SQL?"]
+    userdb [label="Doc store"]
+    patchdb [label="Doc store w/ spatial indexing"]
+    wwwstatedb [label="Doc store"]
+    wwwcontentdb [label="Doc store"]
+  }
+
+  subgraph cluster_endpoints {
+    label="API Endpoints"
+
+    userapi
+    apipool -> userapi
+
+    patchapi
+    apipool -> patchapi
+
+    annotationapi [label="object annotations"]
+    apipool -> annotationapi
+
+    catalogapi
+    apipool -> catalogapi
+
+    alertapi
+    apipool -> alertapi
+
+    obsapi [label="observation schedule"]
+    apipool -> obsapi
+
+    cutoutapi
+    apipool -> cutoutapi
+
+    { rank=same userapi patchapi annotationapi catalogapi alertapi obsapi cutoutapi }
+  }
+
+  // edges between subgraphs
+  // https://stackoverflow.com/questions/2012036/graphviz-how-to-connect-subgraphs
+
+  edge [fontsize=12, decorate=true]
+  {
+    edge [color=orange]
+
+    ua -> lbwww
+    ua -> cdn
+    ua -> lbapi
+    ua -> s3 [label="jpeg tiles"]
+    ua -> s3 [label="alert postagestamps\ncutouts"]
+  }
+
+  edge [color=blue]
+
+  lbwww -> wwwpool
+  cdn   -> wwwpool
+  cdn   -> s3 [label="www assests"]
+  cdn   -> s3 [label="jpeg tiles?", style=dotted]
+  wwwpool -> delayjob [label="account registration email"]
+  delayjob -> delayjobdb
+  delayjob -> smtp
+  wwwpool -> wwwstatedb [label="sesssion state"]
+  wwwpool -> wwwcontentdb [label="dynamic content"]
+  wwwpool -> s3 [label="www assets"]
+  wwwpool -> auth
+  wwwpool -> apipool [label="?"]
+
+  lbapi -> apipool
+  apipool -> apistatedb [label="api state", ltail=cluster_endpoints]
+  apipool -> auth [ltail=cluster_endpoints]
+
+  userapi -> userdb
+
+  patchapi -> userdb
+  patchapi -> patchdb
+
+  annotationapi -> userdb
+  annotationapi -> qserv
+
+  catalogapi -> webserv
+  webserv    -> webservdb
+  catalogapi -> qserv
+
+  alertapi -> alertdb
+
+  obsapi -> obssched
+
+  cutoutapi -> userdb [label="request cutout from DM"]
+  cutoutapi -> delayjob [label="request cutout from DM"]
+  delayjob -> filemgt [label="store retrieved content"]
+  cutoutapi -> filemgt [label="request cutout from DM"]
+
+  filemgt -> s3
+  filemgt -> filemgtdb
+
+  auth -> authdb
+ { rank=same lbwww lbapi cdn }
+ { rank=same wwwpool apipool }
+}
